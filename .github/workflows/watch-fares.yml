@@ -57,13 +57,17 @@ jobs:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           MAIL_FROM: ${{ secrets.MAIL_FROM }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
+          # 手動觸發才有值；排程觸發時這些是空的，等於全部不加。
+          DEBUG_DUMP: ${{ github.event.inputs.debug_dump }}
+          FORCE_EMAIL: ${{ github.event.inputs.force_email }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
         run: |
           set -o pipefail
-          python -m tripcom_watcher run \
-            ${{ inputs.debug_dump && '--debug-dump' || '' }} \
-            ${{ inputs.force_email && '--force-email' || '' }} \
-            ${{ inputs.dry_run && '--dry-run' || '' }} \
-            2>&1 | tee run.log
+          args=()
+          if [ "$DEBUG_DUMP" = "true" ]; then args+=(--debug-dump); fi
+          if [ "$FORCE_EMAIL" = "true" ]; then args+=(--force-email); fi
+          if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+          python -m tripcom_watcher run "${args[@]}" 2>&1 | tee run.log
 
       - name: 把結果寫進執行摘要
         if: always()
@@ -76,7 +80,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: 保存價格歷史
-        if: ${{ !inputs.dry_run }}
+        if: github.event.inputs.dry_run != 'true'
         run: |
           # --porcelain also catches the very first run, when the file is untracked.
           if [ -z "$(git status --porcelain -- data/price_history.json)" ]; then
@@ -100,7 +104,7 @@ jobs:
           echo "::warning::價格歷史推送失敗，本次結果沒有保存"
 
       - name: 上傳 debug 快照
-        if: ${{ always() && inputs.debug_dump }}
+        if: always() && github.event.inputs.debug_dump == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: debug-snapshot-${{ github.run_number }}
