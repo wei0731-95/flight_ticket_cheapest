@@ -8,9 +8,10 @@ from urllib.parse import urlencode
 from .config import SearchConfig
 from .models import SearchQuery
 
+# This page renders the search form pre-filled from the query string. It does
+# NOT run the search on load -- the scraper has to press Search. (/flights/booking
+# was tried as a fallback and redirects to account/signin?forcelogin=authfail.)
 SEARCH_ENDPOINT = "https://www.trip.com/flights/showfarefirst"
-# Older/SEO route that some regions redirect to; used as a second attempt.
-FALLBACK_ENDPOINT = "https://www.trip.com/flights/booking"
 
 
 def date_pairs(search: SearchConfig) -> list[tuple[str, str]]:
@@ -82,6 +83,5 @@ def search_params(query: SearchQuery, search: SearchConfig) -> dict[str, str]:
     return params
 
 
-def build_url(query: SearchQuery, search: SearchConfig, *, fallback: bool = False) -> str:
-    endpoint = FALLBACK_ENDPOINT if fallback else SEARCH_ENDPOINT
-    return f"{endpoint}?{urlencode(search_params(query, search))}"
+def build_url(query: SearchQuery, search: SearchConfig) -> str:
+    return f"{SEARCH_ENDPOINT}?{urlencode(search_params(query, search))}"

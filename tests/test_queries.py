@@ -79,5 +79,7 @@ def test_build_url_is_a_valid_tripcom_search(config, query):
     assert parse_qs(parsed.query)["rdate"] == ["2027-02-13"]
 
 
-def test_fallback_url_uses_the_other_endpoint(config, query):
-    assert urlparse(build_url(query, config.search, fallback=True)).path == "/flights/booking"
+def test_search_url_carries_every_param(config, query):
+    query_string = parse_qs(urlparse(build_url(query, config.search)).query)
+    for key in ("dcity", "acity", "ddate", "rdate", "triptype", "class", "quantity", "childqty"):
+        assert key in query_string

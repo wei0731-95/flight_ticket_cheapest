@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import random
 import time
 from datetime import datetime, timezone
@@ -29,6 +30,7 @@ _XHR_URL_HINTS = ("soa2", "flight", "search", "productlist", "fltproduct", "batc
 _MAX_PAYLOAD_BYTES = 6_000_000
 _MAX_PAYLOADS = 40
 _MAX_SEEN_URLS = 120
+_CURRENCY_TOKENS = r"NT\$|TWD|NTD|US\$|USD|S\$|SGD|HK\$|HKD|RMB|CNY|JPY|KRW|VND|EUR|GBP|[₫€£¥￥]"
 _MAX_CARDS = 80
 
 _USER_AGENTS = (
@@ -113,8 +115,7 @@ class TripScraper:
                 log.warning("%s 已用完本次執行的時間預算，不再重試", query.key)
                 break
             result.attempts = attempt
-            # Later attempts fall back to trip.com's alternate search route.
-            url = build_url(query, self.config.search, fallback=attempt > 2)
+            url = build_url(query, self.config.search)
             result.url = url
             try:
                 offers = await self._attempt(query, url, attempt)
@@ -221,6 +222,12 @@ class TripScraper:
         log.info("[診斷] %s 標題：%r　內文 %d 字　卡片 %d 張　JSON %d 筆",
                  query.key, title, len(page_text), len(cards), len(collector.payloads))
         log.info("[診斷] %s 內文前 800 字：%s", query.key, flat[:800])
+        # If fares render in a currency we did not ask for, the sanity range would
+        # silently reject every one of them -- so surface what the page shows.
+        symbols = sorted(set(re.findall(_CURRENCY_TOKENS, page_text)))
+        numbers = re.findall(r"\d{1,3}(?:,\d{3})+|\d{3,7}", page_text)[:25]
+        log.info("[診斷] %s 頁面出現的幣別符號：%s", query.key, symbols or "（無）")
+        log.info("[診斷] %s 頁面數字樣本：%s", query.key, numbers or "（無）")
         log.info("[診斷] %s 頁面共發出 %d 筆 XHR/fetch：", query.key, len(collector.seen))
         for url in collector.seen[:50]:
             log.info("[診斷]   %s", url)
@@ -340,13 +347,58 @@ class PayloadCollector:
                 return
 
 
-async def _settle(page: Any, results_timeout_ms: int) -> None:
-    """Wait for fares to render, then give streaming results a moment to arrive."""
+# trip.com's search page fills the form from the query string but waits for the
+# user to submit, so the scraper has to press the button itself.
+_SEARCH_BUTTON_SELECTORS = (
+    "[data-testid='search-button']",
+    "[data-testid*='search-btn']",
+    "[data-testid*='searchBtn']",
+    "button.search-btn",
+    ".search-btn",
+    ".o-search-btn",
+    "[class*='searchBtn']",
+    "[class*='search-button']",
+    "button:has-text('Search')",
+    "button:has-text('搜尋')",
+    "button:has-text('搜索')",
+    "a:has-text('Search')",
+    "span.search-btn",
+    "button[type='submit']",
+)
+
+
+async def _wait_for_prices(page: Any, timeout_ms: int) -> bool:
     try:
-        await page.wait_for_function(HAS_PRICES, arg=3, timeout=results_timeout_ms)
+        await page.wait_for_function(HAS_PRICES, arg=3, timeout=timeout_ms)
+        return True
     except PlaywrightTimeout:
-        # Not fatal: the JSON layer may still hold fares even if the DOM lags.
-        log.debug("等待價格渲染逾時，改用已擷取的資料")
+        return False
+
+
+async def _press_search(page: Any) -> str | None:
+    """Click the first visible search button; returns the selector that worked."""
+    for selector in _SEARCH_BUTTON_SELECTORS:
+        try:
+            button = page.locator(selector).first
+            if await button.count() == 0 or not await button.is_visible():
+                continue
+            await button.click(timeout=5_000)
+            return selector
+        except (PlaywrightError, PlaywrightTimeout):
+            continue
+    return None
+
+
+async def _settle(page: Any, results_timeout_ms: int) -> None:
+    """Get fares on screen: submit the search if the page is still just a form."""
+    if not await _wait_for_prices(page, min(12_000, results_timeout_ms)):
+        selector = await _press_search(page)
+        if selector:
+            log.info("頁面沒有自動搜尋，已點擊 %s", selector)
+            if not await _wait_for_prices(page, results_timeout_ms):
+                log.debug("點擊搜尋後仍未看到價格")
+        else:
+            log.warning("找不到可點擊的搜尋按鈕")
     await page.mouse.wheel(0, random.randint(600, 1200))
     await asyncio.sleep(random.uniform(3.0, 6.0))
     try:
