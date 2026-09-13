@@ -17,7 +17,13 @@ from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import Response, TimeoutError as PlaywrightTimeout
 from playwright.async_api import async_playwright
 
-from .browser_js import BLOCK_MARKERS, COLLECT_CARDS, HAS_PRICES, STEALTH_INIT
+from .browser_js import (
+    BLOCK_MARKERS,
+    COLLECT_CARDS,
+    FIND_SEARCH_TARGET,
+    HAS_PRICES,
+    STEALTH_INIT,
+)
 from .config import Config
 from .models import Offer, QueryResult, SearchQuery
 from .parsing import PriceSanity, extract_offers
@@ -376,7 +382,7 @@ async def _wait_for_prices(page: Any, timeout_ms: int) -> bool:
 
 
 async def _press_search(page: Any) -> str | None:
-    """Click the first visible search button; returns the selector that worked."""
+    """Submit the search. Returns a description of what was clicked, or None."""
     for selector in _SEARCH_BUTTON_SELECTORS:
         try:
             button = page.locator(selector).first
@@ -386,7 +392,22 @@ async def _press_search(page: Any) -> str | None:
             return selector
         except (PlaywrightError, PlaywrightTimeout):
             continue
-    return None
+
+    # trip.com's Search is a styled span/div, so fall back to finding it by its
+    # label and clicking the real coordinates.
+    try:
+        target = await page.evaluate(FIND_SEARCH_TARGET)
+    except PlaywrightError:
+        return None
+    if not target or not target.get("found"):
+        if target:
+            log.info("[診斷] 頁面上可點擊的文字樣本：%s", target.get("sample"))
+        return None
+    try:
+        await page.mouse.click(float(target["x"]), float(target["y"]))
+    except (PlaywrightError, PlaywrightTimeout, TypeError, ValueError):
+        return None
+    return f"{target.get('tag')}.{target.get('cls')} 文字={target.get('text')!r}"
 
 
 async def _settle(page: Any, results_timeout_ms: int) -> None:

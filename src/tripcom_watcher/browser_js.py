@@ -83,3 +83,47 @@ BLOCK_MARKERS = (
     "驗證碼",
     "验证码",
 )
+
+
+# trip.com's Search control is not a <button> or <a>, so it cannot be found by
+# tag. Locate the innermost visible element whose text is exactly "Search" and
+# hand back its centre point: clicking it through Playwright's mouse produces a
+# trusted event, which a JS .click() does not.
+FIND_SEARCH_TARGET = """
+() => {
+  const WANT = /^(search|搜尋|搜索|查詢|検索)$/i;
+  const nodes = Array.from(document.querySelectorAll(
+    'button, a, span, div, li, input[type="submit"], input[type="button"], [role="button"]'
+  ));
+  const matches = nodes.filter((el) => {
+    const label = el.tagName === 'INPUT' ? (el.value || '') : (el.textContent || '');
+    if (!WANT.test(label.trim())) return false;
+    const rect = el.getBoundingClientRect();
+    return rect.width > 8 && rect.height > 8;
+  });
+  if (!matches.length) {
+    // Nothing matched: report what clickable labels the page does have, so a
+    // failure still says why.
+    const sample = nodes
+      .map((el) => (el.textContent || '').trim())
+      .filter((t) => t && t.length < 24)
+      .slice(0, 40);
+    return { found: false, sample: Array.from(new Set(sample)).slice(0, 25) };
+  }
+  // Innermost wins: an ancestor can contain the word without being the control.
+  matches.sort((a, b) => (a.textContent || '').length - (b.textContent || '').length
+                      || (a.getBoundingClientRect().width * a.getBoundingClientRect().height)
+                       - (b.getBoundingClientRect().width * b.getBoundingClientRect().height));
+  const target = matches[0];
+  target.scrollIntoView({ block: 'center', inline: 'center' });
+  const rect = target.getBoundingClientRect();
+  return {
+    found: true,
+    x: rect.left + rect.width / 2,
+    y: rect.top + rect.height / 2,
+    tag: target.tagName,
+    cls: String(target.className || '').slice(0, 120),
+    text: (target.textContent || '').trim().slice(0, 40),
+  };
+}
+"""
