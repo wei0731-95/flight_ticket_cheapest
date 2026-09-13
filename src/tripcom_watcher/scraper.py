@@ -234,6 +234,23 @@ class TripScraper:
         numbers = re.findall(r"\d{1,3}(?:,\d{3})+|\d{3,7}", page_text)[:25]
         log.info("[診斷] %s 頁面出現的幣別符號：%s", query.key, symbols or "（無）")
         log.info("[診斷] %s 頁面數字樣本：%s", query.key, numbers or "（無）")
+        # innerText only sees rendered, visible text. If the server already sent
+        # fares that are merely not displayed yet, the raw HTML will show them --
+        # which is a completely different problem from the server sending none.
+        try:
+            html = await page.content()
+        except Exception:
+            html = ""
+        marked = re.findall(rf"(?:{_CURRENCY_TOKENS})\s*\d[\d,]{{2,}}", html)
+        embedded = [
+            token
+            for token in ("flightList", "priceList", "itinerary", "__INITIAL_STATE__",
+                          "window.__", "lowestPrice", "avgPrice", "segmentList")
+            if token in html
+        ]
+        log.info("[診斷] %s 原始 HTML %d 字，含幣別金額 %d 處 %s",
+                 query.key, len(html), len(marked), marked[:8])
+        log.info("[診斷] %s HTML 內嵌資料關鍵字：%s", query.key, embedded or "（無）")
         log.info("[診斷] %s 頁面共發出 %d 筆 XHR/fetch：", query.key, len(collector.seen))
         for url in collector.seen[:50]:
             log.info("[診斷]   %s", url)
