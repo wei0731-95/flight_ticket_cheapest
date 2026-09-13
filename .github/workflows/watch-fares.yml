@@ -19,6 +19,10 @@ on:
         description: 只查詢並印出結果，不寄信也不寫入歷史
         type: boolean
         default: false
+      only:
+        description: 只跑 key 含這段字的查詢（診斷用，例如 TPE-PQC_2027-02-09_2027-02-13）
+        type: string
+        default: ""
 
 # 兩次執行同時寫入 price_history.json 會互相覆蓋，所以排隊而不取消。
 concurrency:
@@ -31,7 +35,7 @@ permissions:
 jobs:
   watch:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -61,12 +65,14 @@ jobs:
           DEBUG_DUMP: ${{ github.event.inputs.debug_dump }}
           FORCE_EMAIL: ${{ github.event.inputs.force_email }}
           DRY_RUN: ${{ github.event.inputs.dry_run }}
+          ONLY: ${{ github.event.inputs.only }}
         run: |
           set -o pipefail
           args=()
           if [ "$DEBUG_DUMP" = "true" ]; then args+=(--debug-dump); fi
           if [ "$FORCE_EMAIL" = "true" ]; then args+=(--force-email); fi
           if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+          if [ -n "$ONLY" ]; then args+=(--only "$ONLY"); fi
           python -m tripcom_watcher run "${args[@]}" 2>&1 | tee run.log
 
       - name: 把結果寫進執行摘要
@@ -75,7 +81,7 @@ jobs:
           {
             echo '## 本次查詢結果'
             echo '```'
-            tail -80 run.log 2>/dev/null || echo '（沒有輸出）'
+            tail -200 run.log 2>/dev/null || echo '（沒有輸出）'
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 

@@ -49,6 +49,10 @@ class ScrapeConfig:
     timeout_ms: int = 90_000
     results_timeout_ms: int = 45_000
     attempts: int = 3
+    # Wall-clock budget for one whole run. Queries still pending when it is
+    # spent are reported as skipped, so a slow run always finishes cleanly
+    # instead of being killed by the CI job timeout.
+    run_budget_s: float = 1500
     retry_backoff_s: tuple[float, ...] = (8, 25, 60)
     delay_between_queries_s: tuple[float, float] = (6, 18)
     price_sanity_min: float = 3_000
@@ -225,6 +229,7 @@ def build_config(raw: dict[str, Any], root: Path = Path(".")) -> Config:
             scrape_raw.get("results_timeout_ms", defaults.results_timeout_ms)
         ),
         attempts=max(1, int(scrape_raw.get("attempts", defaults.attempts))),
+        run_budget_s=float(scrape_raw.get("run_budget_s", defaults.run_budget_s)),
         retry_backoff_s=tuple(float(x) for x in backoff),
         delay_between_queries_s=_as_pair(
             scrape_raw.get("delay_between_queries_s"), defaults.delay_between_queries_s

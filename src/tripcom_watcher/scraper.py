@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import random
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,7 @@ log = logging.getLogger(__name__)
 _XHR_URL_HINTS = ("soa2", "flight", "search", "productlist", "fltproduct", "batch", "lowprice")
 _MAX_PAYLOAD_BYTES = 6_000_000
 _MAX_PAYLOADS = 40
+_MAX_SEEN_URLS = 120
 _MAX_CARDS = 80
 
 _USER_AGENTS = (
@@ -101,12 +103,15 @@ class TripScraper:
 
     # -- per-query ---------------------------------------------------------
 
-    async def scrape(self, query: SearchQuery) -> QueryResult:
+    async def scrape(self, query: SearchQuery, deadline: float | None = None) -> QueryResult:
         scrape_cfg = self.config.scrape
         result = QueryResult(query=query, scraped_at=_now())
         last_error: Exception | None = None
 
         for attempt in range(1, scrape_cfg.attempts + 1):
+            if attempt > 1 and deadline is not None and time.monotonic() >= deadline:
+                log.warning("%s 已用完本次執行的時間預算，不再重試", query.key)
+                break
             result.attempts = attempt
             # Later attempts fall back to trip.com's alternate search route.
             url = build_url(query, self.config.search, fallback=attempt > 2)
@@ -171,6 +176,7 @@ class TripScraper:
             )
 
             if self.debug_dir is not None:
+                await self._describe(page, query, collector, cards, page_text)
                 await self._dump(page, query, attempt, payloads, cards, page_text)
 
             offers = extract_offers(
@@ -190,6 +196,34 @@ class TripScraper:
             return _filter_stops(offers, self.config.search.max_stops)
         finally:
             await context.close()
+
+    async def _describe(
+        self,
+        page: Any,
+        query: SearchQuery,
+        collector: "PayloadCollector",
+        cards: list[dict],
+        page_text: str,
+    ) -> None:
+        """Log what the page actually was.
+
+        Debug artifacts are not reachable from every environment, so the digest
+        that matters for fixing the parser goes into the job log too: where we
+        ended up after redirects, what the page says, and which endpoints it
+        called -- the last one being how the XHR hints get corrected.
+        """
+        try:
+            title = await page.title()
+        except Exception:
+            title = "?"
+        flat = " | ".join(line.strip() for line in page_text.splitlines() if line.strip())
+        log.info("[診斷] %s 最終網址：%s", query.key, page.url)
+        log.info("[診斷] %s 標題：%r　內文 %d 字　卡片 %d 張　JSON %d 筆",
+                 query.key, title, len(page_text), len(cards), len(collector.payloads))
+        log.info("[診斷] %s 內文前 800 字：%s", query.key, flat[:800])
+        log.info("[診斷] %s 頁面共發出 %d 筆 XHR/fetch：", query.key, len(collector.seen))
+        for url in collector.seen[:50]:
+            log.info("[診斷]   %s", url)
 
     async def _dump(
         self,
@@ -221,12 +255,23 @@ class TripScraper:
 
     async def scrape_all(self, queries: list[SearchQuery]) -> list[QueryResult]:
         low, high = self.config.scrape.delay_between_queries_s
+        deadline = time.monotonic() + self.config.scrape.run_budget_s
         results: list[QueryResult] = []
         for index, query in enumerate(queries):
+            if time.monotonic() >= deadline:
+                log.warning("時間預算用盡，跳過 %s", query.key)
+                results.append(
+                    QueryResult(
+                        query=query,
+                        error="SkippedError: 超出本次執行的時間預算，尚未查詢",
+                        scraped_at=_now(),
+                    )
+                )
+                continue
             if index:
                 await asyncio.sleep(random.uniform(low, high))
             log.info("(%d/%d) 查詢 %s", index + 1, len(queries), query.describe())
-            results.append(await self.scrape(query))
+            results.append(await self.scrape(query, deadline=deadline))
         return results
 
 
@@ -244,15 +289,28 @@ class PayloadCollector:
 
     def __init__(self) -> None:
         self.payloads: list[Any] = []
+        # Every XHR/fetch the page made, matched or not. When nothing parses,
+        # this is the only way to find out what trip.com actually calls.
+        self.seen: list[str] = []
         self._tasks: set[asyncio.Task] = set()
 
     def handle(self, response: Response) -> None:
+        content_type = (response.headers or {}).get("content-type", "").lower()
+        try:
+            resource_type = response.request.resource_type
+        except Exception:
+            resource_type = ""
+        if len(self.seen) < _MAX_SEEN_URLS and (
+            resource_type in {"xhr", "fetch"} or "json" in content_type
+        ):
+            self.seen.append(f"[{resource_type or '?'}] {response.url[:240]}")
+
         if len(self.payloads) + len(self._tasks) >= _MAX_PAYLOADS:
             return
         url = response.url.lower()
         if not any(hint in url for hint in _XHR_URL_HINTS):
             return
-        if "json" not in (response.headers or {}).get("content-type", "").lower():
+        if "json" not in content_type:
             return
         task = asyncio.ensure_future(self._read(response))
         self._tasks.add(task)
