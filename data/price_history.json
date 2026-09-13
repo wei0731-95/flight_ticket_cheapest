@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "updated_at": "2026-09-13T12:06:22+00:00",
+  "consecutive_failed_runs": 1,
+  "threshold_notified_total": null,
+  "best": {},
+  "runs": [
+    {
+      "ts": "2026-09-13T12:06:22+00:00",
+      "duration_s": 1441.8,
+      "cheapest": null,
+      "queries": {
+        "TPE-PQC_2027-02-09_2027-02-13": {
+          "offers": 0,
+          "error": "NoResultsError: 頁面載入完成但找不到合理票價（XHR 0 筆 / 卡片 0 張）",
+          "attempts": 3,
+          "total": null,
+          "price": null,
+          "price_basis": null,
+          "source": null
+        },
+        "TSA-PQC_2027-02-09_2027-02-13": {
+          "offers": 0,
+          "error": "NoResultsError: 頁面載入完成但找不到合理票價（XHR 0 筆 / 卡片 0 張）",
+          "attempts": 3,
+          "total": null,
+          "price": null,
+          "price_basis": null,
+          "source": null
+        },
+        "TPE-PQC_2027-02-09_2027-02-14": {
+          "offers": 0,
+          "error": "NoResultsError: 頁面載入完成但找不到合理票價（XHR 0 筆 / 卡片 0 張）",
+          "attempts": 3,
+          "total": null,
+          "price": null,
+          "price_basis": null,
+          "source": null
+        },
+        "TSA-PQC_2027-02-09_2027-02-14": {
+          "offers": 0,
+          "error": "NoResultsError: 頁面載入完成但找不到合理票價（XHR 0 筆 / 卡片 0 張）",
+          "attempts": 3,
+          "total": null,
+          "price": null,
+          "price_basis": null,
+          "source": null
+        },
+        "TPE-PQC_2027-02-10_2027-02-14": {
+          "offers": 0,
+          "error": "NoResultsError: 頁面載入完成但找不到合理票價（XHR 0 筆 / 卡片 0 張）",
+          "attempts": 3,
+          "total": null,
+          "price": null,
+          "price_basis": null,
+          "source": null
+        },
+        "TSA-PQC_2027-02-10_2027-02-14": {
+          "offers": 0,
+          "error": "NoResultsError: 頁面載入完成但找不到合理票價（XHR 0 筆 / 卡片 0 張）",
+          "attempts": 3,
+          "total": null,
+          "price": null,
+          "price_basis": null,
+          "source": null
+        }
+      }
+    }
+  ]
+}
