@@ -1,0 +1,50 @@
+{
+  "status": 0,
+  "data": {
+    "lowestPrice": 15200,
+    "baggageFee": 1200,
+    "currency": "TWD",
+    "flightItineraryList": [
+      {
+        "priceList": [
+          {"adultPrice": 18999, "childPrice": 17500, "totalPrice": 128993, "currency": "TWD"}
+        ],
+        "journeyList": [
+          {
+            "segmentList": [
+              {"departAirport": "TPE", "arriveAirport": "SGN", "departTime": "2027-02-09 08:30",
+               "arriveTime": "2027-02-09 11:20", "airlineCode": "VN", "flightNo": "VN577"},
+              {"departAirport": "SGN", "arriveAirport": "PQC", "departTime": "2027-02-09 13:40",
+               "arriveTime": "2027-02-09 14:45", "airlineCode": "VN", "flightNo": "VN1821"}
+            ]
+          },
+          {
+            "segmentList": [
+              {"departAirport": "PQC", "arriveAirport": "SGN", "departTime": "2027-02-13 16:10",
+               "arriveTime": "2027-02-13 17:15", "airlineCode": "VN", "flightNo": "VN1830"},
+              {"departAirport": "SGN", "arriveAirport": "TPE", "departTime": "2027-02-13 23:55",
+               "arriveTime": "2027-02-14 04:30", "airlineCode": "VN", "flightNo": "VN578"}
+            ]
+          }
+        ]
+      },
+      {
+        "priceList": [{"adultPrice": 15200, "totalPrice": 103360}],
+        "journeyList": [
+          {
+            "segmentList": [
+              {"departAirport": "TPE", "arriveAirport": "PQC", "departTime": "2027-02-09 09:00",
+               "arriveTime": "2027-02-09 12:10", "airlineCode": "VJ", "flightNo": "VJ931"}
+            ]
+          },
+          {
+            "segmentList": [
+              {"departAirport": "PQC", "arriveAirport": "TPE", "departTime": "2027-02-13 13:00",
+               "arriveTime": "2027-02-13 18:05", "airlineCode": "VJ", "flightNo": "VJ932"}
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tripcom-watcher"
+version = "0.1.0"
+description = "Watch trip.com round-trip fares from Taipei (TPE/TSA) to Phu Quoc (PQC) and email on a new low."
+requires-python = ">=3.11"
+dependencies = ["playwright>=1.49.0", "PyYAML>=6.0.1"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "src"]

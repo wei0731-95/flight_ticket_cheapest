@@ -1,0 +1,63 @@
+# trip.com 機票監控設定
+# 台北(松山 TSA / 桃園 TPE) -> 富國島 (PQC)，5 大 2 小，2027 農曆年後
+
+search:
+  # 出發機場：松山與桃園各搜一次，結果合併後取最便宜
+  origins: [TPE, TSA]
+  destination: PQC
+
+  # 可出發的最早日期 / 必須回到台灣的最晚日期
+  window_start: "2027-02-09"
+  window_end: "2027-02-14"
+
+  # 幾夜的組合要納入搜尋（4 夜 = 五天四夜，5 夜 = 六天五夜）
+  min_nights: 4
+  max_nights: 5
+
+  passengers:
+    adults: 5
+    children: 2        # 2-11 歲，佔位
+    infants: 0
+    child_ages: [8, 10]   # 僅供信件備註與日後精算，trip.com 搜尋只吃人數
+
+  cabin: economy       # economy | premium_economy | business | first
+  currency: TWD
+  locale: zh-tw
+  max_stops: null      # null = 不限轉機次數；設 0 只看直飛、1 只看轉一次
+
+scrape:
+  headless: true
+  # 單次查詢的整體逾時（毫秒）
+  timeout_ms: 90000
+  # 等待價格出現的逾時（毫秒）
+  results_timeout_ms: 45000
+  # 每個查詢最多嘗試幾次
+  attempts: 3
+  # 每次重試前等待秒數（依序取用，用完取最後一個）
+  retry_backoff_s: [8, 25, 60]
+  # 查詢之間的隨機間隔秒數，降低被風控標記的機率
+  delay_between_queries_s: [6, 18]
+  # 價格合理性範圍（TWD），用來濾掉頁面上的雜訊數字（行李費、稅金等）
+  price_sanity_min: 3000
+  price_sanity_max: 600000
+  # 結果卡片的 CSS selector；留空會用結構啟發式自動找（第一次跑完看 debug 快照後可以在這裡釘死）
+  card_selectors: []
+  # true 時把 HTML / XHR JSON / 截圖存到 debug/，方便對照實際頁面結構
+  debug_dump: false
+
+notify:
+  # 出現歷史新低就寄信
+  on_new_low: true
+  # 低於這個絕對金額也寄信（TWD，null = 關閉）
+  absolute_threshold: null
+  # 要比前一次最低價再便宜至少這個金額才算「新低」，避免小幅波動洗版
+  min_drop: 1
+  # 即使沒有新低也每次都寄一封摘要（建議先設 false）
+  always_summary: false
+  # 連續幾次查詢全部失敗就寄一封警告信
+  failure_alert_threshold: 3
+
+storage:
+  history_path: data/price_history.json
+  # 保留最近幾次執行的明細
+  keep_runs: 500
